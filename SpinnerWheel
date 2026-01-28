@@ -1,0 +1,191 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { motion } from 'framer-motion';
+
+const SEGMENTS = [
+  { label: 'LOSE', color: '#6366F1', isWin: false },
+  { label: 'LOSE', color: '#8B5CF6', isWin: false },
+  { label: 'LOSE', color: '#EC4899', isWin: false },
+  { label: 'WIN', color: '#10B981', isWin: true },
+  { label: 'LOSE', color: '#F59E0B', isWin: false },
+  { label: 'LOSE', color: '#3B82F6', isWin: false },
+  { label: 'LOSE', color: '#EF4444', isWin: false },
+  { label: 'LOSE', color: '#14B8A6', isWin: false },
+  { label: 'LOSE', color: '#7C3AED', isWin: false },
+  { label: 'LOSE', color: '#059669', isWin: false },
+  { label: 'WIN', color: '#22C55E', isWin: true },
+  { label: 'LOSE', color: '#DC2626', isWin: false },
+];
+
+// 2 win segments out of 12 = 16.67% chance of winning (less than 20%)
+
+export default function SpinnerWheel({ onSpinEnd, isSpinning, setIsSpinning }) {
+  const [rotation, setRotation] = useState(0);
+  const wheelRef = useRef(null);
+  
+  const segmentAngle = 360 / SEGMENTS.length;
+  
+  const spin = () => {
+    if (isSpinning) return;
+    
+    setIsSpinning(true);
+    
+    // Random number of full rotations (5-8) plus random final position
+    const fullRotations = 5 + Math.random() * 3;
+    const randomAngle = Math.random() * 360;
+    const totalRotation = rotation + (fullRotations * 360) + randomAngle;
+    
+    setRotation(totalRotation);
+    
+    // Calculate which segment we'll land on
+    setTimeout(() => {
+      // The pointer is at top (12 o'clock). We need to find which segment is there.
+      // Segments are drawn starting from 12 o'clock going clockwise.
+      // After rotation, we need to find which segment ended up at the pointer.
+      const finalAngle = totalRotation % 360;
+      // Invert because wheel rotates clockwise but segments are indexed clockwise from top
+      const pointerAngle = (360 - finalAngle + 360) % 360;
+      const landedIndex = Math.floor(pointerAngle / segmentAngle) % SEGMENTS.length;
+      const result = SEGMENTS[landedIndex];
+      
+      setIsSpinning(false);
+      onSpinEnd(result);
+    }, 5000);
+  };
+
+  const renderSegments = () => {
+    return SEGMENTS.map((segment, index) => {
+      const startAngle = index * segmentAngle;
+      const endAngle = startAngle + segmentAngle;
+      
+      // Convert to radians
+      const startRad = (startAngle - 90) * (Math.PI / 180);
+      const endRad = (endAngle - 90) * (Math.PI / 180);
+      
+      const radius = 150;
+      const x1 = 150 + radius * Math.cos(startRad);
+      const y1 = 150 + radius * Math.sin(startRad);
+      const x2 = 150 + radius * Math.cos(endRad);
+      const y2 = 150 + radius * Math.sin(endRad);
+      
+      const largeArc = segmentAngle > 180 ? 1 : 0;
+      
+      const pathD = `M 150 150 L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} Z`;
+      
+      // Text positioning
+      const midAngle = (startAngle + segmentAngle / 2 - 90) * (Math.PI / 180);
+      const textRadius = radius * 0.65;
+      const textX = 150 + textRadius * Math.cos(midAngle);
+      const textY = 150 + textRadius * Math.sin(midAngle);
+      const textRotation = startAngle + segmentAngle / 2;
+      
+      return (
+        <g key={index}>
+          <path
+            d={pathD}
+            fill={segment.color}
+            stroke="#1E1B4B"
+            strokeWidth="2"
+          />
+          <text
+            x={textX}
+            y={textY}
+            fill="white"
+            fontSize="14"
+            fontWeight="bold"
+            textAnchor="middle"
+            dominantBaseline="middle"
+            transform={`rotate(${textRotation}, ${textX}, ${textY})`}
+            style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.5)' }}
+          >
+            {segment.label}
+          </text>
+        </g>
+      );
+    });
+  };
+
+  return (
+    <div className="relative flex flex-col items-center">
+      {/* Pointer */}
+      <div className="absolute -top-2 z-20 transform">
+        <div className="w-0 h-0 border-l-[20px] border-r-[20px] border-t-[35px] border-l-transparent border-r-transparent border-t-yellow-400 drop-shadow-lg" 
+             style={{ filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.3))' }} />
+      </div>
+      
+      {/* Wheel Container */}
+      <div className="relative">
+        {/* Outer glow ring */}
+        <div className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-500 via-pink-500 to-yellow-500 blur-md opacity-50 scale-105" />
+        
+        {/* Wheel border */}
+        <div className="relative p-3 rounded-full bg-gradient-to-br from-yellow-400 via-yellow-500 to-amber-600 shadow-2xl">
+          <div className="p-2 rounded-full bg-gradient-to-br from-gray-800 to-gray-900">
+            <motion.svg
+              ref={wheelRef}
+              width="300"
+              height="300"
+              viewBox="0 0 300 300"
+              animate={{ rotate: rotation }}
+              transition={{ 
+                duration: 5, 
+                ease: [0.2, 0.8, 0.2, 1]
+              }}
+              className="drop-shadow-xl"
+            >
+              {/* Background circle */}
+              <circle cx="150" cy="150" r="148" fill="#1E1B4B" />
+              
+              {/* Segments */}
+              {renderSegments()}
+              
+              {/* Center decoration */}
+              <circle cx="150" cy="150" r="25" fill="url(#centerGradient)" stroke="#FCD34D" strokeWidth="3" />
+              <circle cx="150" cy="150" r="15" fill="#1E1B4B" />
+              <circle cx="150" cy="150" r="8" fill="#FCD34D" />
+              
+              {/* Gradient definitions */}
+              <defs>
+                <radialGradient id="centerGradient" cx="50%" cy="50%" r="50%">
+                  <stop offset="0%" stopColor="#FCD34D" />
+                  <stop offset="100%" stopColor="#D97706" />
+                </radialGradient>
+              </defs>
+            </motion.svg>
+          </div>
+        </div>
+      </div>
+      
+      {/* Spin Button */}
+      <motion.button
+        onClick={spin}
+        disabled={isSpinning}
+        whileHover={{ scale: isSpinning ? 1 : 1.05 }}
+        whileTap={{ scale: isSpinning ? 1 : 0.95 }}
+        className={`mt-10 px-12 py-4 rounded-full text-xl font-bold uppercase tracking-wider transition-all duration-300 ${
+          isSpinning 
+            ? 'bg-gray-400 cursor-not-allowed text-gray-600' 
+            : 'bg-gradient-to-r from-yellow-400 via-yellow-500 to-amber-500 text-gray-900 hover:shadow-lg hover:shadow-yellow-500/50'
+        }`}
+      >
+        {isSpinning ? (
+          <span className="flex items-center gap-2">
+            <motion.span
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            >
+              ⭐
+            </motion.span>
+            Spinning...
+          </span>
+        ) : (
+          'SPIN!'
+        )}
+      </motion.button>
+      
+      {/* Odds display */}
+      <p className="mt-4 text-gray-400 text-sm">
+        Win chance: <span className="text-yellow-400 font-semibold">16.67%</span>
+      </p>
+    </div>
+  );
+}
